@@ -6,10 +6,11 @@ router = APIRouter()
 
 @router.get("/health/live")
 async def liveness():
-    return {"status": "alive"}
+    return {"status":"alive"}
 
 @router.get("/health/ready")
 async def readiness():
-    db_ok, model_ok = await database_ready(), await ollama_ready()
-    return {"status": "ready" if db_ok and model_ok else "not_ready",
-            "dependencies": {"database": db_ok, "ollama": model_ok}}
+    db_ok, ollama_ok = await database_ready(), await ollama_ready()
+    ready = db_ok and ollama_ok
+    return {"status":"ready" if ready else "not_ready",
+            "dependencies":{"database":db_ok,"ollama":ollama_ok}}
