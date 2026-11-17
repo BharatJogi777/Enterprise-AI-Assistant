@@ -1,9 +1,8 @@
-"""Optional Langfuse integration; application remains usable without credentials."""
-from contextlib import contextmanager
+"""Optional Langfuse integration scaffold; app operation does not depend on telemetry."""
 from enterprise_ai.core.config import get_settings
 
 def langfuse_enabled() -> bool:
-    cfg = get_settings()
+    cfg=get_settings()
     return bool(cfg.langfuse_public_key and cfg.langfuse_secret_key)
 
 def flush_tracing() -> None:
