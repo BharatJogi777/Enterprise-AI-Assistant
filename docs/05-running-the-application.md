@@ -14,24 +14,16 @@ python -m pip install -e ".[dev]"
 cp .env.example .env
 ```
 
-Edit `.env`: set a unique `API_KEY`. For Tavily search set `TAVILY_API_KEY`. Start PostgreSQL and the API:
+Edit `.env` and set a unique `API_KEY`. For Tavily search, set `TAVILY_API_KEY`. Start PostgreSQL and API:
 
 ```bash
 docker compose up -d db
 uvicorn enterprise_ai.main:app --reload --app-dir src
 ```
 
-The host API uses PostgreSQL localhost:5434 and Ollama localhost:11434. Container deployment:
-
-```bash
-docker compose up --build
-```
-
-The Compose API connects to PostgreSQL by service name and Ollama via host.docker.internal. This is a local development topology, not hardened production deployment.
+The host API uses PostgreSQL localhost:5434 and Ollama localhost:11434. For containerized API, run `docker compose up --build`; it connects to PostgreSQL by service name and Ollama via host.docker.internal. This is a developer topology, not a hardened production deployment.
 
 ## API calls
-
-Set the API key in your shell:
 
 ```bash
 export API_KEY_VALUE='your-local-api-key'
@@ -43,7 +35,7 @@ curl -H "X-API-Key: $API_KEY_VALUE" -H 'Content-Type: application/json' \
   http://localhost:8000/api/v1/assistant/ask
 ```
 
-Create an agent conversation using a UUID:
+Agent conversation:
 
 ```bash
 curl -X POST http://localhost:8000/api/v1/conversations/chat \
@@ -51,16 +43,17 @@ curl -X POST http://localhost:8000/api/v1/conversations/chat \
   -d '{"conversation_id":"9e4a4bd4-68e2-4df1-ae2a-50e9e0a7e4e1","message":"Search our handbook for leave rules and summarize them."}'
 ```
 
-## MCP
+Multi-agent researcher/synthesizer workflow uses the same request body at `POST /api/v1/conversations/research`.
 
-Configure a trusted MCP Streamable HTTP endpoint in `.env`:
+## Multiple MCP servers
+
+Configure only trusted Streamable HTTP servers. The value is JSON; each server has a unique name, URL and exact allowlist:
 
 ```dotenv
-MCP_SERVER_URL=http://localhost:9000/mcp
-MCP_ALLOWED_TOOLS=lookup_ticket,read_service_health
+MCP_SERVERS_JSON=[{"name":"tickets","url":"http://host.docker.internal:9001/mcp","allowed_tools":["lookup_ticket","create_ticket"]},{"name":"monitoring","url":"http://host.docker.internal:9002/mcp","allowed_tools":["read_service_health"]}]
 ```
 
-Restart the API. Discover the allowlisted tools at `GET /api/v1/integrations/mcp/tools`, then call a permitted tool through `POST /api/v1/integrations/mcp/call`. Confirm the server's authentication, network policy and tool side effects independently.
+In a dotenv file, quote the JSON value if your shell/parser requires it. Restart the API. Discover allowlisted tools at `GET /api/v1/integrations/mcp/tools`. Call a permitted tool using `POST /api/v1/integrations/mcp/call` with `server_name`, `tool_name` and `arguments`. Verify each server's authentication, network policy and side effects independently.
 
 ## Tests
 
@@ -71,4 +64,4 @@ ruff check .
 
 ## Limitations
 
-Only UTF-8 TXT/Markdown is accepted. Chunking is fixed word-window and retrieval is cosine similarity only. Conversation IDs are not bound to authenticated users. The shared API key is not enterprise identity. The DuckDuckGo adapter is an Instant Answer endpoint, not a full web search engine. Langfuse credentials are configuration scaffolding; end-to-end trace export still needs instrumentation and verification. Database tables are currently bootstrapped by application SQL rather than a versioned migration workflow. Do not expose publicly until the controls in docs/07 are completed.
+Only UTF-8 TXT/Markdown is accepted. Chunking is fixed word-window and retrieval is cosine similarity only. Conversation IDs are not bound to authenticated users. The shared API key is not enterprise identity. DuckDuckGo Instant Answer is not a full web search engine. Langfuse configuration exists but end-to-end trace export still requires instrumentation and verification. Database tables are bootstrapped by application SQL rather than a versioned migration workflow. Do not expose publicly until the controls in docs/07 are completed.

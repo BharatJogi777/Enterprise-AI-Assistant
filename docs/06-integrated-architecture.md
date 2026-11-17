@@ -4,18 +4,18 @@
 
 ```text
 Client -> FastAPI -> API-key gate / CORS / request context
-                  |-> Document ingestion -> chunking -> Ollama embeddings -> pgvector
+                  |-> Documents -> chunking -> Ollama embeddings -> pgvector
                   |-> RAG query -> vector retrieval -> bounded evidence -> Ollama
-                  |-> Chat -> LangGraph ReAct -> allowlisted tools -> Ollama
-                  |-> Research -> LangGraph researcher -> synthesizer -> answer
-                  |-> Integrations -> web provider / configured MCP server
+                  |-> Chat -> LangGraph ReAct -> allowlisted tools
+                  |-> Research -> researcher agent -> synthesis agent
+                  |-> Integrations -> web provider / named MCP servers
                   |-> Conversation history -> PostgreSQL
                   +-> JSON logs / optional Langfuse integration scaffold
 ```
 
 ## Trust boundaries
 
-The model is an untrusted decision component, never an authorization boundary. Application configuration controls built-in tools and MCP tool allowlists. MCP server URL is operator configuration, not request input. Retrieved documents, web results and tool outputs are untrusted evidence, not instructions. A shared API key is only a local gate; it is not user identity or tenant authorization.
+The model is not an authorization boundary. Application configuration controls built-in tools and per-server MCP tool allowlists. MCP server URLs are operator-supplied JSON configuration, never request input. Retrieved documents, web results and tool outputs are untrusted evidence, not instructions. A shared API key is only a local gate; it is not user identity or tenant authorization.
 
 ## RAG
 
@@ -23,8 +23,8 @@ UTF-8 TXT/Markdown uploads are byte-limited, split into overlapping word windows
 
 ## Agents
 
-The single-agent endpoint uses LangGraph's prebuilt ReAct graph with a recursion limit. The multi-agent endpoint is a sequential researcher -> synthesizer graph. The researcher can use allowlisted internal/web search; the synthesizer is instructed to answer only from collected evidence. These are bounded workflows, not autonomous agents with unrestricted access.
+The single-agent endpoint uses LangGraph's prebuilt ReAct graph with a recursion limit. The multi-agent endpoint is a sequential researcher -> synthesizer graph. The researcher can use allowlisted internal/web search; the synthesizer answers from the evidence bundle. These are bounded workflows, not autonomous agents with unrestricted access.
 
 ## MCP and web
 
-MCP uses Streamable HTTP and one operator-configured server URL with an exact tool allowlist. Web search supports Tavily and a limited DuckDuckGo Instant Answer fallback. Use a provider with clear quotas, attribution and data-retention terms for production.
+MCP uses Streamable HTTP. Configure multiple trusted servers in `MCP_SERVERS_JSON`, each with a unique `name`, `url` and exact `allowed_tools` array. The API never accepts server URLs or unlisted tool names from clients. Web search supports Tavily and a limited DuckDuckGo Instant Answer fallback.

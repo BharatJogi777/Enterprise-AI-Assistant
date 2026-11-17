@@ -10,7 +10,7 @@ An integrated local-first enterprise assistant built with FastAPI, Ollama, Postg
 - LangGraph ReAct assistant with server-side allowlisted calculator, UTC, internal-search and web-search tools.
 - Two-node LangGraph multi-agent workflow: researcher then synthesizer.
 - PostgreSQL conversation history with bounded history retrieval and deletion endpoint.
-- MCP Streamable HTTP client with operator-configured endpoint and exact tool-name allowlist.
+- MCP Streamable HTTP client supporting multiple operator-configured servers with per-server tool allowlists.
 - Docker Compose, tests, sample evaluation dataset and security/operations docs.
 
 ## Quick start
@@ -55,13 +55,13 @@ API docs: http://localhost:8000/docs
 | GET | `/api/v1/integrations/mcp/tools` | List allowlisted MCP tools |
 | POST | `/api/v1/integrations/mcp/call` | Call an allowlisted MCP tool |
 
-Protected endpoints require `X-API-Key` when configured. The health probes remain public.
+Protected endpoints require `X-API-Key` when configured. Health probes remain public.
 
 ## Integrations
 
 - Web: set `WEB_SEARCH_PROVIDER=tavily` and `TAVILY_API_KEY`. DuckDuckGo Instant Answer is a limited fallback, not a general web index.
-- MCP: set `MCP_SERVER_URL` to a trusted Streamable HTTP endpoint and `MCP_ALLOWED_TOOLS` to comma-separated exact tool names. The request body cannot choose a server URL.
-- Langfuse: configuration and a small optional client scaffold are present; verify and finish end-to-end trace instrumentation before relying on it operationally.
+- MCP: configure `MCP_SERVERS_JSON` as an array of objects with unique `name`, trusted `url`, and exact `allowed_tools` array. See the runbook. The request body cannot choose a server URL.
+- Langfuse: configuration and a small optional client scaffold are present; end-to-end trace export must be instrumented and verified before relying on it operationally.
 
 ## Tests
 
