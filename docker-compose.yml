@@ -1,0 +1,27 @@
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: enterprise_ai
+      POSTGRES_USER: enterprise_ai
+      POSTGRES_PASSWORD: local_only_change_me
+    ports: ["5434:5432"]
+    volumes: [postgres_data:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL","pg_isready -U enterprise_ai -d enterprise_ai"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+  api:
+    build: .
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://enterprise_ai:local_only_change_me@db:5432/enterprise_ai
+      OLLAMA_BASE_URL: http://host.docker.internal:11434
+    ports: ["8000:8000"]
+    depends_on:
+      db: {condition: service_healthy}
+    extra_hosts: ["host.docker.internal:host-gateway"]
+    restart: unless-stopped
+volumes:
+  postgres_data:
