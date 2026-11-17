@@ -1,32 +1,17 @@
 # Enterprise AI Assistant
 
-An integrated, local-first enterprise assistant built around FastAPI, Ollama, PostgreSQL/pgvector, LangChain and LangGraph. It combines internal-document RAG, optional public-web search, bounded tool-using conversations, persistent conversation history and an explicitly configured MCP client.
+An integrated local-first enterprise assistant built with FastAPI, Ollama, PostgreSQL/pgvector, LangChain, LangGraph and an MCP client. It provides internal-document RAG, optional public-web search, bounded tool-using conversations, persistent conversation history and a two-agent research/synthesis workflow.
 
-## Features in this repository
+## Included
 
-- **API foundation:** FastAPI app factory, versioned routes, CORS configuration, request IDs, JSON logs and liveness/readiness probes.
-- **RAG:** UTF-8 TXT/Markdown ingestion, overlapping chunking, Ollama embeddings, pgvector cosine retrieval, bounded context and source metadata.
-- **Web search:** Tavily adapter; DuckDuckGo Instant Answer fallback (limited coverage, not a full search index).
-- **Agent:** LangGraph ReAct workflow using Ollama with an explicit server-side tool allowlist (calculator, UTC clock, internal search and web search).
-- **Memory:** PostgreSQL conversation history with bounded history retrieval and conversation deletion endpoint.
-- **MCP:** Streamable HTTP client with operator-configured server URL and explicit remote-tool allowlist.
-- **Operations:** Docker Compose, health probes, environment configuration, unit tests, evaluation starter dataset and security/release documentation.
-
-## Architecture
-
-```text
-Client -> FastAPI -> API-key gate / request context
-                  |-> Documents -> chunk -> Ollama embeddings -> PostgreSQL/pgvector
-                  |-> RAG ask -> retrieve -> bounded evidence -> Ollama response
-                  |-> Chat -> LangGraph -> allowlisted tools -> Ollama
-                  |                         |-> internal RAG
-                  |                         |-> public web search
-                  |                         |-> calculator / UTC clock
-                  |-> Integrations -> web provider / configured MCP server
-                  |-> Conversations -> PostgreSQL message history
-```
-
-The model is not an authorization boundary. Tool permissions are enforced by application configuration. Documents, web results and tool outputs are untrusted evidence, not instructions.
+- FastAPI versioned API, CORS, request IDs, JSON logs and liveness/readiness probes.
+- TXT/Markdown ingestion, chunking, Ollama embeddings, pgvector retrieval and grounded answers with source metadata.
+- Tavily web search adapter and limited DuckDuckGo Instant Answer fallback.
+- LangGraph ReAct assistant with server-side allowlisted calculator, UTC, internal-search and web-search tools.
+- Two-node LangGraph multi-agent workflow: researcher then synthesizer.
+- PostgreSQL conversation history with bounded history retrieval and deletion endpoint.
+- MCP Streamable HTTP client with operator-configured endpoint and exact tool-name allowlist.
+- Docker Compose, tests, sample evaluation dataset and security/operations docs.
 
 ## Quick start
 
@@ -42,7 +27,7 @@ python -m pip install -e ".[dev]"
 cp .env.example .env
 ```
 
-Set a unique local API key in `.env`. Pull models and start services:
+Set a unique `API_KEY` in .env. Pull models and start the database:
 
 ```bash
 ollama pull llama3.2:3b
@@ -51,57 +36,44 @@ docker compose up -d db
 uvicorn enterprise_ai.main:app --reload --app-dir src
 ```
 
-Open http://localhost:8000/docs. For the containerized API, run `docker compose up --build`; Ollama remains on the host and is reached through `host.docker.internal`.
+API docs: http://localhost:8000/docs
 
-## API endpoints
+## API
 
 | Method | Path | Purpose |
 |---|---|---|
 | GET | `/api/v1/health/live` | Process liveness |
-| GET | `/api/v1/health/ready` | PostgreSQL + Ollama connectivity |
-| POST | `/api/v1/documents` | Upload TXT/Markdown |
-| GET | `/api/v1/documents` | List indexed documents |
-| POST | `/api/v1/assistant/search` | Semantic internal search |
+| GET | `/api/v1/health/ready` | Database/Ollama readiness |
+| POST | `/api/v1/documents` | Ingest TXT/Markdown |
+| GET | `/api/v1/documents` | List documents |
+| POST | `/api/v1/assistant/search` | Internal semantic search |
 | POST | `/api/v1/assistant/ask` | Grounded RAG answer |
-| POST | `/api/v1/conversations/chat` | LangGraph agent conversation |
-| DELETE | `/api/v1/conversations/{uuid}` | Delete conversation history |
-| POST | `/api/v1/integrations/web-search` | Direct public web search |
-| GET | `/api/v1/integrations/mcp/tools` | Discover allowlisted MCP tools |
+| POST | `/api/v1/conversations/chat` | Tool-using agent + memory |
+| POST | `/api/v1/conversations/research` | Researcher/synthesizer agents |
+| DELETE | `/api/v1/conversations/{uuid}` | Delete conversation messages |
+| POST | `/api/v1/integrations/web-search` | Direct web search |
+| GET | `/api/v1/integrations/mcp/tools` | List allowlisted MCP tools |
 | POST | `/api/v1/integrations/mcp/call` | Call an allowlisted MCP tool |
 
-Protected endpoints require `X-API-Key` when `API_KEY` is configured. The example environment sets a placeholder; replace it before use.
+Protected endpoints require `X-API-Key` when configured. The health probes remain public.
 
-## Web search configuration
+## Integrations
 
-Recommended: set `WEB_SEARCH_PROVIDER=tavily` and provide `TAVILY_API_KEY`. The default sample configuration uses Tavily. DuckDuckGo Instant Answer can be selected for a keyless but limited fallback. Public web search sends the user's query to the configured provider.
+- Web: set `WEB_SEARCH_PROVIDER=tavily` and `TAVILY_API_KEY`. DuckDuckGo Instant Answer is a limited fallback, not a general web index.
+- MCP: set `MCP_SERVER_URL` to a trusted Streamable HTTP endpoint and `MCP_ALLOWED_TOOLS` to comma-separated exact tool names. The request body cannot choose a server URL.
+- Langfuse: configuration and a small optional client scaffold are present; verify and finish end-to-end trace instrumentation before relying on it operationally.
 
-## MCP configuration
-
-Set `MCP_SERVER_URL` to a trusted Streamable HTTP MCP server and `MCP_ALLOWED_TOOLS` to comma-separated exact tool names. The API never accepts a server URL from a request. Do not expose arbitrary MCP servers or discovered tools to end users.
-
-## Tests and evaluation
+## Tests
 
 ```bash
 python -m pytest -q
 ruff check .
-python -c "import asyncio; from enterprise_ai.evaluation.runner import evaluate_dataset; print(asyncio.run(evaluate_dataset('evals/sample_dataset.json')))"
 ```
 
-The sample evaluation data is illustrative. Add a reviewed gold dataset before using scores as release gates.
+The evaluation starter is in `evals/sample_dataset.json`; see docs/08-evaluation-and-release.md.
 
-## Documentation
+## Security boundary
 
-- [Requirements and scope](docs/01-requirements-and-scope.md)
-- [Initial architecture](docs/02-system-architecture.md)
-- [Technology decisions](docs/03-technology-decisions.md)
-- [Implementation roadmap](docs/04-implementation-roadmap.md)
-- [Runbook](docs/05-running-the-application.md)
-- [Integrated architecture](docs/06-integrated-architecture.md)
-- [Security and operations](docs/07-security-and-operations.md)
-- [Evaluation and release gates](docs/08-evaluation-and-release.md)
+This is a runnable reference implementation, not a certified production system. It still needs enterprise OIDC/RBAC, tenant and document ACL enforcement, conversation ownership, distributed rate limits, audit-grade event logging, managed secrets, formal migrations, backup/restore automation, retention workflows, comprehensive tracing, hybrid retrieval/reranking, advanced file extraction and security/load testing. Do not expose it publicly or ingest confidential company data until those controls are implemented and verified.
 
-## Explicit limitations
-
-This is a substantial runnable reference implementation, not a certified production system. It currently supports TXT/Markdown only; vector-only retrieval; a shared API key rather than enterprise OIDC/RBAC; conversation IDs without user ownership; one configured MCP server; basic web-search integration; and starter evaluation. It does not yet include tenant/document ACL isolation, PDF/DOCX/OCR, hybrid retrieval/reranking, admin UI, audit-grade events, distributed rate limits, managed secrets, formal schema migration automation, backup/restore automation, or comprehensive tracing. Do not expose it publicly or load confidential enterprise data until the security and operational controls in the documentation are implemented and tested.
-
-No GitHub Actions workflow is included.
+See docs/06-integrated-architecture.md and docs/07-security-and-operations.md. No GitHub Actions workflow is included.
